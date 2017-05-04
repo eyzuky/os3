@@ -8,7 +8,9 @@
 
 #include "Search.hpp"
 #include "MapReduceFramework.h"
+#include "SearchKeyValues.hpp"
 
+#define MULTI_THREADED_LEVEL 10
 int main(int argc, char* argv[]){
     
     using namespace std;
@@ -21,12 +23,18 @@ int main(int argc, char* argv[]){
     SearchMapReduce searcher = SearchMapReduce(toSearch);
     
     
-
+    IN_ITEMS_VEC inputVector;
     
+    for (int i = 2; i < argc; ++i)
+    {
+        SearchK1* directory = new SearchK1(argv[i]);
+        inputVector.push_back(make_pair((k1Base*)directory, (v1Base*)nullptr));
+        
+    }
     
-    
-    
-    
+    OUT_ITEMS_VEC outputVector = RunMapReduceFramework(searcher, inputVector, MULTI_THREADED_LEVEL, true);
+    //todo: print the files 
+    return 0;
     
     
 }
