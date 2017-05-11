@@ -11,6 +11,13 @@
 #include <vector>
 #include <pthread.h>
 #include <list>
+
+//===========================
+//DEFINES
+
+#define BULK 10
+
+
 using namespace std;
 
 //===============================
@@ -33,7 +40,6 @@ typedef list<reduced_pair> reduced_list;
 
 
 //=============dast class======
-#define BULK 10
 
 class mapDataHandler {
 
@@ -81,7 +87,7 @@ public:
     unsigned int nextBulkIndex() const { return _bulkIndex;}
     unsigned int proceedToNextBulk() { this->_bulkIndex = BULK + _bulkIndex;}
     unsigned int getSize() { this->_items.size();}
-    void applyMap(const k2Base *const keyOne, const shuffled_list *const _items)
+    void applyReduce(const k2Base *const keyOne, const shuffled_list *const _items)
     {
         this->mapReduceBase.reduce(keyOne,valueOne);
     }
@@ -90,24 +96,42 @@ public:
     }
 };
 
+
+void * frameworkInitialization(){
+    //todo initialize all the global variables
+}
+
 void * mapExec(){
 
 }
 
+
+void * shuffle(){
+
+}
+
+
+void * joinQueues(){
+
+}
+
+
+void * reduceExec(){
+
+}
 
 
 
 OUT_ITEMS_VEC RunMapReduceFramework(MapReduceBase& mapReduce, IN_ITEMS_VEC& itemsVec,
                                     int multiThreadLevel, bool autoDeleteV2K2)
 {
-    
+    frameworkInitialization();
     
     
     
     pthread_t shuffle_thread;
     pthread_t *map_threads = new pthread_t[multiThreadLevel];
-    
-    
+
     
     OUT_ITEMS_VEC out_items_vec;
     return out_items_vec;
@@ -119,6 +143,7 @@ void Emit2 (k2Base*, v2Base*)
 {
     
 }
+
 void Emit3 (k3Base*, v3Base*)
 {
     
