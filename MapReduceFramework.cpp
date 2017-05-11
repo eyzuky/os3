@@ -39,11 +39,10 @@ class mapDataHandler {
 
     private:
     unsigned int _bulkIndex;
-    const
 
 
     public:
-    dataHandler(IN_ITEMSstst_VEC& items_vec, const MapReduceBase& mapReduceBase){
+    dataHandler(IN_ITEMS_VEC& items_vec, const MapReduceBase& mapReduceBase){
                 _bulkIndex = 0;
                 _items = items_vec;
                 _mapReduceBase = mapReduceBase;
