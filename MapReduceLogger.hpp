@@ -17,8 +17,15 @@
 #include <fstream>
 using namespace std;
 
+//-----------------------------------------------------
+//Enum for sender and mapping for the logger into strings
 enum Sender { ExecMap, Shuffle, ExecReduce };
-
+pair<Sender, string> senderToString [] = {
+    std::pair<Sender, string>(ExecMap, "ExecMap"),
+    std::pair<Sender, string>(Shuffle, "Shuffle"),
+    std::pair<Sender, string>(ExecReduce, "ExecReduce")
+};
+//-----------------------------------------------------
 class MapReduceLogger
 {
 public:
@@ -34,5 +41,7 @@ public:
     void mapAndShuffleTime();
     void reduceAndOutputTime();
     void printFinished();
+private:
+    string getTime();
 };
 #endif /* MapReduceLogger_hpp */
