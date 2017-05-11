@@ -15,6 +15,8 @@
 #include <string>
 #include <stdio.h>
 #include <fstream>
+#include <ctime>
+#include <sys/time.h>
 using namespace std;
 
 //-----------------------------------------------------
@@ -36,12 +38,20 @@ public:
     ~MapReduceLogger();
     
     void logInitOfFramework(int multiThreadLevel);
-    void threadCreated(Sender sender);
-    void threadTerminated(Sender sender);
-    void mapAndShuffleTime();
-    void reduceAndOutputTime();
-    void printFinished();
+    void logThreadCreated(Sender sender);
+    void logThreadTerminated(Sender sender);
+    void logMapAndShuffleTime();
+    void logReduceAndOutputTime();
+    void logFinished();
+    void startTimeMap();
+    void endTimeMap();
+    void startTimeReduce();
+    void endTimeReduce();
 private:
+    struct timeval mapStartTime;
+    struct timeval mapEndTime;
+    struct timeval reduceStartTime;
+    struct timeval reduceEndTime;
     string getTime();
 };
 #endif /* MapReduceLogger_hpp */

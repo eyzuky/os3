@@ -7,9 +7,9 @@
 //
 
 #include "MapReduceLogger.hpp"
-#include <ctime>
 #include <iostream>
 
+#define TO_NANO 1000000000
 MapReduceLogger::MapReduceLogger ()
 {
     log_file.open(".MapReduceFramework.log");
@@ -17,8 +17,6 @@ MapReduceLogger::MapReduceLogger ()
        {
         //todo - print the correct error message
        }
-    
-    
 }
 
 MapReduceLogger::~MapReduceLogger ()
@@ -33,7 +31,7 @@ void MapReduceLogger::logInitOfFramework(int multiThreadLevel)
     pthread_mutex_unlock(&log_mutex);
 }
 
-void MapReduceLogger::threadCreated(Sender sender)
+void MapReduceLogger::logThreadCreated(Sender sender)
 {
     pthread_mutex_lock(&log_mutex);
     string x;
@@ -52,7 +50,7 @@ void MapReduceLogger::threadCreated(Sender sender)
     pthread_mutex_unlock(&log_mutex);
 }
 
-void MapReduceLogger::threadTerminated(Sender sender)
+void MapReduceLogger::logThreadTerminated(Sender sender)
 {
     pthread_mutex_lock(&log_mutex);
     string x;
@@ -71,9 +69,44 @@ void MapReduceLogger::threadTerminated(Sender sender)
     pthread_mutex_unlock(&log_mutex);
 }
 
+void MapReduceLogger::logMapAndShuffleTime()
+{
+    pthread_mutex_lock(&log_mutex);
+    log_file << "Map and Shuffle took " << (mapEndTime.tv_sec - mapStartTime.tv_sec)*TO_NANO + (mapEndTime.tv_usec - mapStartTime.tv_usec)*TO_NANO << " ns\n";
+    pthread_mutex_unlock(&log_mutex);
+}
 
+void MapReduceLogger::logReduceAndOutputTime()
 
+{
+    pthread_mutex_lock(&log_mutex);
+    log_file << "Reduce took " << (reduceEndTime.tv_sec - reduceStartTime.tv_sec)*TO_NANO + (reduceEndTime.tv_usec - reduceStartTime.tv_usec)*TO_NANO << " ns\n";
+    pthread_mutex_unlock(&log_mutex);
+}
 
+void MapReduceLogger::logFinished()
+{
+    pthread_mutex_lock(&log_mutex);
+    log_file << "RunMapReduceFramework finished\n";
+    pthread_mutex_unlock(&log_mutex);
+}
+
+void MapReduceLogger::startTimeMap()
+{
+    gettimeofday(&mapStartTime, NULL);
+}
+void MapReduceLogger::endTimeMap()
+{
+    gettimeofday(&mapEndTime, NULL);
+}
+void MapReduceLogger::startTimeReduce()
+{
+    gettimeofday(&reduceStartTime, NULL);
+}
+void MapReduceLogger::endTimeReduce()
+{
+    gettimeofday(&reduceEndTime, NULL);
+}
 
 string MapReduceLogger::getTime()
 {
