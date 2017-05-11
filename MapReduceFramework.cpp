@@ -53,7 +53,7 @@ class mapDataHandler {
                 _bulkIndex = 0;
                 _items = items_vec;
                 _mapReduceBase = mapReduceBase;
-                // todo not sure about this
+                 todo not sure about this
    }
 
     unsigned int nextBulkIndex() const { return _bulkIndex;}
