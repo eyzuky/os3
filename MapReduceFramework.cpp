@@ -32,9 +32,55 @@ typedef list<reduced_pair> reduced_list;
 
 
 
-//===============================
+//=============dast class======
+#define BULK 10
+
+class mapDataHandler {
+
+    private:
+    unsigned int _bulkIndex;
+    const
 
 
+    public:
+    dataHandler(IN_ITEMSstst_VEC& items_vec, const MapReduceBase& mapReduceBase){
+                _bulkIndex = 0;
+                _items = items_vec;
+                _mapReduceBase = mapReduceBase;
+                // todo not sure about this
+   }
+
+    unsigned int nextBulkIndex() const { return _bulkIndex;}
+    unsigned int proceedToNextBulk() { this->_bulkIndex = BULK + _bulkIndex;}
+    unsigned int getSize() { this->_items.size();}
+
+};
+
+
+class reduceDataHandler {
+
+private:
+    unsigned int _bulkIndex;
+    const IN_ITEMS_VEC _items;
+    const MapReduceBase& mapReduceBase;
+
+
+public:
+    dataHandler(IN_ITEMS_VEC &items_vec, const MapReduceBase& mapReduceBase){
+        _bulkIndex = 0;
+        _items = items_vec;
+        _mapReduceBase = mapReduceBase;
+        // todo not sure about this
+    }
+
+    unsigned int nextBulkIndex() const { return _bulkIndex;}
+    unsigned int proceedToNextBulk() { this->_bulkIndex = BULK + _bulkIndex;}
+
+};
+
+void * mapExec(){
+
+}
 
 
 
