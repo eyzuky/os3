@@ -39,7 +39,11 @@ pthread_mutex_t index_mutex;
 map <pthread_t, pthread_mutex_t> thread_mutex_map;
 map <pthread_t, map_pair_list> thread_list_map;
 map <pthread_t, map_pair_list> thread_list_reduce;
+
+pthread_cond_t exec_shuffle_notification;
 shuffled_list shuffled;
+MapReduceLogger *logger = new MapReduceLogger();
+
 //=============dast class======
 //notice that I almost remade this class, there were tons of conceptual errors (e.g trying to set a const not in the initialization list,
 // or wrong names of variables and stuff. see git commits to see the differences
@@ -54,9 +58,12 @@ class mapDataHandler {
     mapDataHandler(IN_ITEMS_VEC &items_vec, const MapReduceBase& mapReduceBase): _items(items_vec), _mapReduceBase(mapReduceBase){
                 _bulkIndex = 0;
    }
-    unsigned int proceedToNextBulk()
+    void proceedToNextBulk()
     {
         this->_bulkIndex = BULK + _bulkIndex;
+    }
+    int getCurrentIndex()
+    {
         return this->_bulkIndex;
     }
     unsigned int getSize() {
@@ -112,6 +119,35 @@ void * frameworkInitialization(){
 
 void * mapExec(void * data){
 
+    logger->logThreadCreated(ExecMap);
+    int curIndex = 0;
+    IN_ITEM item;
+    mapDataHandler * handler = (mapDataHandler*) data;
+    while (handler->getCurrentIndex() < handler->getSize()) {
+        pthread_mutex_lock(&index_mutex);
+        curIndex = handler->getCurrentIndex();
+        handler->proceedToNextBulk();
+        pthread_mutex_unlock(&index_mutex);
+        for (int i = curIndex; i < curIndex + BULK; ++i)
+        {
+            if(i >= handler->getSize())
+            {
+                break;
+            }
+            item = handler->getItem(i);
+            handler->applyMap(item.first, item.second);
+        }
+        pthread_mutex_lock(&thread_mutex_map[pthread_self()]);
+        
+        //todo - copy the items somewhere else...... ??
+        
+        
+        pthread_mutex_unlock(&thread_mutex_map[pthread_self()]);
+        pthread_cond_signal(&exec_shuffle_notification);
+    }
+    logger->logThreadTerminated(ExecMap);
+
+    
     return nullptr;
 }
 
@@ -141,7 +177,6 @@ OUT_ITEMS_VEC RunMapReduceFramework(MapReduceBase& mapReduce, IN_ITEMS_VEC& item
     //===========================================================================
     // log info
     //===========================================================================
-    MapReduceLogger *logger = new MapReduceLogger();
     logger->logInitOfFramework(multiThreadLevel);
     logger->startTimeMap();
     //===========================================================================
