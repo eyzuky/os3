@@ -38,7 +38,8 @@ pthread_mutex_t map_mutex;
 pthread_mutex_t index_mutex;
 map <pthread_t, pthread_mutex_t> thread_mutex_map;
 map <pthread_t, map_pair_list> thread_list_map;
-
+map <pthread_t, map_pair_list> thread_list_reduce;
+shuffled_list shuffled;
 //=============dast class======
 //notice that I almost remade this class, there were tons of conceptual errors (e.g trying to set a const not in the initialization list,
 // or wrong names of variables and stuff. see git commits to see the differences
@@ -137,10 +138,13 @@ OUT_ITEMS_VEC RunMapReduceFramework(MapReduceBase& mapReduce, IN_ITEMS_VEC& item
                                     int multiThreadLevel, bool autoDeleteV2K2)
 {
     frameworkInitialization();
+    //===========================================================================
+    // log info
+    //===========================================================================
     MapReduceLogger *logger = new MapReduceLogger();
     logger->logInitOfFramework(multiThreadLevel);
     logger->startTimeMap();
-    //=====================
+    //===========================================================================
     // map and shuffle
     mapDataHandler map_handler = mapDataHandler(itemsVec, mapReduce);
     pthread_t *map_threads = new pthread_t[multiThreadLevel];
@@ -156,7 +160,6 @@ OUT_ITEMS_VEC RunMapReduceFramework(MapReduceBase& mapReduce, IN_ITEMS_VEC& item
         thread_mutex_map[map_threads[i]] = PTHREAD_MUTEX_INITIALIZER;
     }
     pthread_mutex_unlock(&map_mutex);
-    
     pthread_create(&shuffle_thread, NULL, shuffle, nullptr);
     for (int i = 0; i < multiThreadLevel; ++i)
     {
@@ -167,18 +170,30 @@ OUT_ITEMS_VEC RunMapReduceFramework(MapReduceBase& mapReduce, IN_ITEMS_VEC& item
     {
         pthread_mutex_destroy(&(iter->second));
     }
-    //======================
+    delete [] map_threads;
+    //===========================================================================
+    // log info
+    //============================================================================
     logger->endTimeMap();
     logger->logMapAndShuffleTime();
     logger->startTimeReduce();
-    //======================
+    //============================================================================
     //reduce and output
+    reduceDataHandler reduce_handler = reduceDataHandler(shuffled, mapReduce);
+    pthread_t *reduce_threads = new pthread_t[multiThreadLevel];
+    
+    for (int i = 0; i < multiThreadLevel; ++i)
+    {
+        pthread_create(&reduce_threads[i], NULL, reduceExec, &reduce_handler);
+    }
+    
+    
+    
+    
     OUT_ITEMS_VEC out_items_vec;
-
-    
-    
-    
-    //======================
+    //============================================================================
+    // log info
+    //============================================================================
     logger->endTimeReduce();
     logger->logReduceAndOutputTime();
     logger->logFinished();
