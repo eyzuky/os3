@@ -1,0 +1,32 @@
+eyzuky, tal.rota
+Eyal Silberman (30309734), Tal Rota (200945590)
+
+=====
+FILES
+=====
+
+
+
+
+
+
+==============
+OPEN QUESTIONS
+==============
+
+1. We thought of idea of using pipes and file descriptors. Every thread created for mapping will get a pipe.
+Then we can hold a global list of file descriptors in an array such that every map threads holds one, and it will write
+data into the file descriptor. the shuffle will be able to read from the file descriptor and get the data to shuffle.
+
+Pseudo code:
+- create multiThreadLevel amount of threads, with a file descriptor given to each thread
+- start mapping (same like the original design) but write the output data into the files instead of the array of k2,v2 pairs
+- shuffle will try to read info from the files when it gets a notification message from a mapping thread
+
+
+2. Assuming we have a 8 core machine, we would probably decide to use all the cores for the mapping thread (6 for exec map,
+1 for shuffle and 1 main thread). For the reduce phase we will use 7 (6 for execReduce and 1 main).
+We believe this is the best performance in our occasion since we actually do not do any context switching so we pretty much
+reduce the overhead and get better performance.
+
+3.
