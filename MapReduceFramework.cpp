@@ -24,19 +24,19 @@ using namespace std;
 //===============================
 //TYPEDEFS
 
-typedef pair<k2Base,v2Base> map_pair;
-typedef list<map_pair> map_pair_list;
-typedef pair<k2Base, list<v2Base>> shuffled_pair;
-typedef list<shuffled_pair> shuffled_list;
-typedef pair<k3Base, v3Base> reduced_pair;
-typedef list<reduced_pair> reduced_list;
-typedef pair<pthread_t, map_pair_list> thread_and_list;
-typedef list<thread_and_list> threads_and_their_list;
+typedef pair<k2Base,v2Base> map_pair;             // INTERMEDIATE_ITEM;
+typedef list<map_pair> map_pair_list;             // INTERMEDIATE_ITEMS_LIST
+typedef pair<k2Base, list<v2Base>> shuffled_pair; // REDUCE_ITEM
+typedef list<shuffled_pair> shuffled_list;        // REDUCE_ITEMS_LIST
+typedef pair<k3Base, v3Base> reduced_pair;        // OUT_ITEM
+typedef list<reduced_pair> reduced_list;          // OUT_ITEMS_QUEUE
+typedef pair<pthread_t, map_pair_list> thread_and_list; // threadsOutput
+typedef list<thread_and_list> threads_and_their_list; //
 //===============================
 //GLOBALS AND MUTEX
 pthread_mutex_t map_mutex;
 pthread_mutex_t index_mutex;
-map <pthread_t, pthread_mutex_t> thread_mutex_map;
+map <pthread_t, pthread_mutex_t> thread_mutex_map; //threadsItemsListsMutex
 map <pthread_t, map_pair_list> thread_list_map;
 map <pthread_t, map_pair_list> thread_list_reduce;
 
@@ -44,6 +44,7 @@ pthread_cond_t exec_shuffle_notification;
 shuffled_list shuffled;
 MapReduceLogger *logger = new MapReduceLogger();
 
+bool mapPartOver;
 //=============dast class======
 //notice that I almost remade this class, there were tons of conceptual errors (e.g trying to set a const not in the initialization list,
 // or wrong names of variables and stuff. see git commits to see the differences
@@ -105,13 +106,14 @@ public:
     {
     //    this->_mapReduceBase.Reduce(keyOne,valueOne);
     }
-//    IN_ITEM getItem(unsigned int index){
-//        return this->_items[index];
-//    }  //TODO - something here doesn't work
+    shuffled_pair getItem(unsigned int index){
+        return this->_items[index];
+    }  //TODO - something here doesn't work -  i think its ok now :)
 };
 
 
 void * frameworkInitialization(){
+    mapPartOver = false;
     //todo initialize all the global variables
     
     return nullptr;
@@ -123,6 +125,7 @@ void * mapExec(void * data){
     int curIndex = 0;
     IN_ITEM item;
     mapDataHandler * handler = (mapDataHandler*) data;
+
     while (handler->getCurrentIndex() < handler->getSize()) {
         pthread_mutex_lock(&index_mutex);
         curIndex = handler->getCurrentIndex();
@@ -139,12 +142,21 @@ void * mapExec(void * data){
         }
         pthread_mutex_lock(&thread_mutex_map[pthread_self()]);
         
-        //todo - copy the items somewhere else...... ??
-        
-        
+        // todo uniting all the queues...
+        map_pair itemToAdd;
+        map_pair_list& queueToCopy = thread_list_map[pthread_self()];
+        map_pair_list& destQueue = threadsItemsLists[pthread_self()];
+
+        while (!queueToCopy.empty())
+        {
+            itemToAdd = queueToCopy.front();
+            queueToCopy.pop();
+            destQueue.push(itemToAdd);
+        }
+
         pthread_mutex_unlock(&thread_mutex_map[pthread_self()]);
-        pthread_cond_signal(&exec_shuffle_notification);
     }
+    pthread_cond_signal(&exec_shuffle_notification);
     logger->logThreadTerminated(ExecMap);
 
     
@@ -152,13 +164,61 @@ void * mapExec(void * data){
 }
 
 void * shuffle(void * data){
+    logger->logThreadCreated(Shuffle);
+
+    pthread_mutex_lock(&mapMutex); // todo mapmutex or indexMutex
+    pthread_mutex_unlock(&mapMutex);
+//    checkIfWriteSucceed(); // todo do we need this?
+
+    int retVal;
+
+    while (!mapPartOver)
+    {
+        timeToWait = getTimeToWait();
+
+        pthread_mutex_lock(&fakeMutex);
+        retVal = pthread_cond_timedwait(&shufflerCV, &fakeMutex, &timeToWait);
+
+        if (retVal != 0 && retVal != ETIMEDOUT)
+        {
+            exitIfFail(1, COND_TIMEDWAIT);
+        }
+        pthread_mutex_unlock(&fakeMutex);
+
+        joinQueues();
+    }
+    joinQueues();
+
+    pthread_mutex_lock(&logMutex);
+    logger->logThreadTerminated(Shuffle);
+
+    pthread_mutex_unlock(&logMutex);
+//    //todo checkIfWriteSucceed(); - do we need this?
 
     return nullptr;
 }
 
 
 void * joinQueues(void * data){
-
+    map_pair itemToAdd;
+    for (auto it = threadsItemsLists.begin();
+         it != threadsItemsLists.end();
+         ++it){
+        while (!it->second.empty()){
+            pthread_mutex_lock(&threadsItemsListsMutex[it->first]);
+            itemToAdd = it->second.front();
+            it->second.pop();
+            if (shuffled.count(itemToAdd.first) == 0)
+            {
+                shuffled[itemToAdd.first] = std::list<v2Base *>(1, itemToAdd.second);
+            }
+            else    // shufflerMap has that key.
+            {
+                shuffled[itemToAdd.first].push_back(itemToAdd.second);
+            }
+        }
+        pthread_mutex_unlock(&threadsItemsListsMutex[it->first]);
+    }
     return nullptr;
 }
 
@@ -174,6 +234,7 @@ OUT_ITEMS_VEC RunMapReduceFramework(MapReduceBase& mapReduce, IN_ITEMS_VEC& item
                                     int multiThreadLevel, bool autoDeleteV2K2)
 {
     frameworkInitialization();
+
     //===========================================================================
     // log info
     //===========================================================================
@@ -181,7 +242,9 @@ OUT_ITEMS_VEC RunMapReduceFramework(MapReduceBase& mapReduce, IN_ITEMS_VEC& item
     logger->startTimeMap();
     //===========================================================================
     // map and shuffle
+
     mapDataHandler map_handler = mapDataHandler(itemsVec, mapReduce);
+    
     pthread_t *map_threads = new pthread_t[multiThreadLevel];
     pthread_t shuffle_thread;
     
@@ -200,6 +263,8 @@ OUT_ITEMS_VEC RunMapReduceFramework(MapReduceBase& mapReduce, IN_ITEMS_VEC& item
     {
         pthread_join(map_threads[i], NULL);
     }
+    mapPartOver = true;
+
     pthread_join(shuffle_thread, NULL);
     for (auto iter = thread_mutex_map.begin(); iter != thread_mutex_map.end(); ++iter)
     {
@@ -212,6 +277,7 @@ OUT_ITEMS_VEC RunMapReduceFramework(MapReduceBase& mapReduce, IN_ITEMS_VEC& item
     logger->endTimeMap();
     logger->logMapAndShuffleTime();
     logger->startTimeReduce();
+
     //============================================================================
     //reduce and output
     reduceDataHandler reduce_handler = reduceDataHandler(shuffled, mapReduce);
@@ -221,9 +287,7 @@ OUT_ITEMS_VEC RunMapReduceFramework(MapReduceBase& mapReduce, IN_ITEMS_VEC& item
     {
         pthread_create(&reduce_threads[i], NULL, reduceExec, &reduce_handler);
     }
-    
-    
-    
+
     
     OUT_ITEMS_VEC out_items_vec;
     //============================================================================
