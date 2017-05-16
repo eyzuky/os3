@@ -13,6 +13,7 @@
 #include <list>
 #include "MapReduceLogger.hpp"
 #include <map>
+#include <vector>
 //===========================
 //DEFINES
 
@@ -25,13 +26,13 @@ using namespace std;
 //TYPEDEFS
 
 typedef pair<k2Base,v2Base> map_pair;             // INTERMEDIATE_ITEM;
-typedef list<map_pair> map_pair_list;             // INTERMEDIATE_ITEMS_LIST
+typedef vector<map_pair> map_pair_list;             // INTERMEDIATE_ITEMS_LIST
 typedef pair<k2Base, list<v2Base>> shuffled_pair; // REDUCE_ITEM
-typedef list<shuffled_pair> shuffled_list;        // REDUCE_ITEMS_LIST
+typedef vector<shuffled_pair> shuffled_list;        // REDUCE_ITEMS_LIST
 typedef pair<k3Base, v3Base> reduced_pair;        // OUT_ITEM
-typedef list<reduced_pair> reduced_list;          // OUT_ITEMS_QUEUE
+typedef vector<reduced_pair> reduced_list;          // OUT_ITEMS_QUEUE
 typedef pair<pthread_t, map_pair_list> thread_and_list; // threadsOutput
-typedef list<thread_and_list> threads_and_their_list; //
+typedef vector<thread_and_list> threads_and_their_list; //
 //===============================
 //GLOBALS AND MUTEX
 pthread_mutex_t map_mutex;
@@ -102,6 +103,10 @@ public:
     {
         return this->_items.size();
     }
+    int getCurrentIndex()
+    {
+        return this->_bulkIndex;
+    }
     void applyReduce(const k2Base *const keyOne, const shuffled_list *const _items)
     {
     //    this->_mapReduceBase.Reduce(keyOne,valueOne);
@@ -109,6 +114,7 @@ public:
     shuffled_pair getItem(unsigned int index){
         return this->_items[index];
     }  //TODO - something here doesn't work -  i think its ok now :)
+    //Works now because a list in c++ is a linked list and you cannot access it with index.. so it is a vector now
 };
 
 
@@ -224,7 +230,26 @@ void * joinQueues(void * data){
 
 
 void * reduceExec(void * data){
-
+    
+    
+    logger->logThreadCreated(ExecReduce);
+    int curIndex = 0;
+    shuffled_pair pair;
+    reduceDataHandler *handler = (reduceDataHandler*)data;
+    while ( handler->getCurrentIndex() < handler->getSize()) {
+        pthread_mutex_lock(&index_mutex);
+        curIndex = handler->getCurrentIndex();
+        handler->proceedToNextBulk();
+        for(int i = 0; i < BULK; i++){
+            if(i >= handler->getSize())
+            {
+                break;
+            }
+            pair = handler->getItem(i);
+            handler->applyReduce(pair.first, pair.second);
+        }
+    }
+    
     return nullptr;
 }
 
