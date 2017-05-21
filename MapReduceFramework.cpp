@@ -55,23 +55,21 @@ static void exceptionCaller(string exc){
     exit(FAIL);
 }
 
-
-
 bool mapPartOver;
 //=============dast class======
 //notice that I almost remade this class, there were tons of conceptual errors (e.g trying to set a const not in the initialization list,
 // or wrong names of variables and stuff. see git commits to see the differences
 class mapDataHandler {
 
-    private:
+private:
     unsigned int _bulkIndex;
     const IN_ITEMS_VEC _items;
     const MapReduceBase& _mapReduceBase;
-    
-    public:
+
+public:
     mapDataHandler(IN_ITEMS_VEC &items_vec, const MapReduceBase& mapReduceBase): _items(items_vec), _mapReduceBase(mapReduceBase){
-                _bulkIndex = 0;
-   }
+        _bulkIndex = 0;
+    }
     void proceedToNextBulk()
     {
         this->_bulkIndex = BULK + _bulkIndex;
@@ -132,10 +130,35 @@ void * frameworkInitialization(){
     if(sem_init(&sem, 0 ,0) == FAIL){
         exceptionCaller(" Sem init Fail");
     }
+    // mutex init
+    pthread_mutex_init(&fakeMutex, NULL);
+    pthread_mutex_init(&reduce_mutex, NULL);
+    pthread_mutex_init(&map_mutex, NULL);
+    pthread_mutex_init(&index_mutex, NULL);
     //todo initialize all the global variables
-    
+
     return nullptr;
 }
+
+void * frameworkDistraction(){
+    mapPartOver = false;
+
+    // mutex destroy
+    pthread_mutex_destroy(&fakeMutex);
+    pthread_mutex_destroy(&reduce_mutex);
+    pthread_mutex_destroy(&map_mutex);
+    pthread_mutex_destroy(&index_mutex);
+    //todo initialize all the global variables
+    //globals clear
+    sem_destroy(&sem);
+    thread_mutex_map.clear();
+    thread_list_map.clear(); //threadsItemsListsTemp
+    thread_list_reduce.clear();
+    shuffled.clear();
+
+    return nullptr;
+}
+
 void * mapExec(void * data){
     int test; //test will check for errors and exceptions
     logger->logThreadCreated(ExecMap);
@@ -170,13 +193,13 @@ void * mapExec(void * data){
         // todo uniting all the queues...
         map_pair itemToAdd;
         map_pair_list& queueToCopy = thread_list_map[pthread_self()];
-       // map_pair_list& destQueue = threadsItemsLists[pthread_self()]; // todo check threadsItemsLists right palce?
+        // map_pair_list& destQueue = threadsItemsLists[pthread_self()]; // todo check threadsItemsLists right palce?
 
         while (!queueToCopy.empty())
         {
             itemToAdd = queueToCopy.front();
-       //     queueToCopy.pop();
-        //    destQueue.push(itemToAdd);
+            //     queueToCopy.pop();
+            //    destQueue.push(itemToAdd);
         }
 
         test = pthread_mutex_unlock(&thread_mutex_map[pthread_self()]);
@@ -190,9 +213,11 @@ void * mapExec(void * data){
     }
     logger->logThreadTerminated(ExecMap);
 
-    
+
     return nullptr;
 }
+
+
 
 void * joinQueues() {
     for (auto it = thread_list_map.begin(); it != thread_list_map.end(); ++it)
@@ -219,7 +244,9 @@ void * joinQueues() {
 void * shuffle(void * data){
     logger->logThreadCreated(Shuffle);
 
-    pthread_mutex_lock(&map_mutex); // todo mapmutex or indexMutex
+
+    pthread_mutex_lock(&map_mutex);
+
     pthread_mutex_unlock(&map_mutex);
 
     int retVal;
@@ -234,29 +261,28 @@ void * shuffle(void * data){
         // todo?
         pthread_mutex_lock(&fakeMutex);
 
-      
+
        // pthread_mutex_unlock(&fakeMutex);
 
     }
     joinQueues();
 
- //   pthread_mutex_lock(&logMutex);
+    //   pthread_mutex_lock(&logMutex);
     logger->logThreadTerminated(Shuffle);
 
- //   pthread_mutex_unlock(&logMutex);
+    //   pthread_mutex_unlock(&logMutex);
 //    //todo checkIfWriteSucceed(); - do we need this?
 
     return nullptr;
 }
 
 
-
 void * reduceExec(void * data){
     int test;
-    
+
     logger->logThreadCreated(ExecReduce);
     int curIndex = 0;
-   // shuffled_pair pair;
+    // shuffled_pair pair;
     reduceDataHandler *handler = (reduceDataHandler*)data;
     while ( handler->getCurrentIndex() < handler->getSize()) {
         test = pthread_mutex_lock(&index_mutex);
@@ -274,11 +300,9 @@ void * reduceExec(void * data){
             handler->applyReduce(pair.first, pair.second);
         }
     }
-    
+
     return nullptr;
 }
-
-
 
 OUT_ITEMS_VEC RunMapReduceFramework(MapReduceBase& mapReduce, IN_ITEMS_VEC& itemsVec,
                                     int multiThreadLevel, bool autoDeleteV2K2)
@@ -328,6 +352,9 @@ OUT_ITEMS_VEC RunMapReduceFramework(MapReduceBase& mapReduce, IN_ITEMS_VEC& item
         if (test == FAIL){
             exceptionCaller("Failed to join threads");
         }
+    }
+    if(sem_post( &sem) == FAIL){
+        exceptionCaller("sem post fail");
     }
     mapPartOver = true;
 
