@@ -217,6 +217,15 @@ void * mapExec(void * data){
     return nullptr;
 }
 
+struct CompareFirst
+{
+    CompareFirst(k2Base* val) : val_(val) {}
+    bool operator()(const shuffled_pair elem) const {
+        return val_ == elem.first;
+    }
+private:
+    k2Base* val_;
+};
 
 void * joinQueues() {
     for (auto it = thread_list_map.begin(); it != thread_list_map.end(); ++it)
@@ -225,13 +234,13 @@ void * joinQueues() {
         pthread_mutex_lock(&thread_mutex_map[it->first]);
         for(auto pair = list.begin(); pair != list.end(); ++pair)
         {
-            if(std::find(shuffled.begin(), shuffled.end(), pair->first) == (shuffled.end()->first)) {
+            if(std::find_if(shuffled.begin(), shuffled.end(), CompareFirst(pair->first)) == (shuffled.end())) {
                 V2_VEC newVec;
                 newVec.insert(newVec.begin(), pair->second);
                 shuffled_pair item = make_pair(pair->first, newVec);
                 shuffled.insert(shuffled.end(), item);
             } else {
-                shuffled_pair * iter = std::find(shuffled.begin(), shuffled.end(), pair->first);
+                auto iter = std::find_if(shuffled.begin(), shuffled.end(), CompareFirst(pair->first));
                 iter->second.insert(iter->second.begin(), pair->second);
             }
         }
