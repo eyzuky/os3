@@ -29,4 +29,54 @@ Pseudo code:
 We believe this is the best performance in our occasion since we actually do not do any context switching so we pretty much
 reduce the overhead and get better performance.
 
-3.
+3. We will compare all methods
+
+Utilizing multi-cores
+=====================
+When we have a multi core system, we can use its power of multithreading.
+- Nira: As we can see in Nira's implementation, she is not using it and losing computation power.
+- Danny: Even though Danny used the user level thread system, he still doesn't use the different cores since he is working without the kernel and he cannot invoke different cores to run the different threads.
+- Moti and Galit - they use the power of the multi core system since they both use the kernel level threading/processing system.
+
+The ability to create a sophisticated scheduler, based on internal data
+=======================================================================
+All users except Danny who used the user level library, cannot create the scheduler since they either do not implement multithreading (in case of Nira and Galit) or they do not have a way to manipulate the scheduling system since it is
+    Kernel based, and happens automatically by the os (case of Moti).
+
+Communication time (between different threads/processes)
+========================================================
+- Nira - not relevant since she only has one thread/process. There is no one to communicate with
+- Moti - gets great communication time since it is handled by the operating system, but not the best possible
+- Danny's communication is the best since it is happening without system calls, all handled in the same process
+- Galit - As for Galit, she must use a pipe/file to handle the communication, and that is the slowest of all others.
+
+Ability to progress while a certain thread/process is blocked
+=============================================================
+Nira - Not relevant since there is only one thread.
+Moti - Some threads can make progress but a blocked process cannot do anything
+Danny - Danny can have progress even if an internal thread is blocked by the internal scheduler. But incase the process is blocked there is no place for progress.
+Galit - Can continue to progress even if a process is blocked.
+
+Overall speed
+=============
+This depends on the amount of data and usage of the library.
+If the implementation of the library functions includes many disk writing, for example, then Galit and Moti will be better
+because they use the power of multicore processing.
+If the implememtation includes a lot of CPU usage (math and processing arithmetic for example) then Nira and Danny will probably
+perform better, since they have less context switching to do.
+
+
+4.
+Process
+=======
+Nothing is shared between parent of a child.
+
+Kernel level thread
+===================
+Heap and global variables are shared, but each thread has its own stack.
+
+User level thread
+=================
+all is shared, the system is "blind" to the differences.
+
+5.
