@@ -24,7 +24,7 @@ Pseudo code:
 - shuffle will try to read info from the files when it gets a notification message from a mapping thread
 
 
-2. Assuming we have a 8 core machine, we would probably decide to use all the cores for the mapping thread (6 for exec map,
+2. Assuming we have an 8 core machine, we would probably decide to use all the cores for the mapping thread (6 for exec map,
 1 for shuffle and 1 main thread). For the reduce phase we will use 7 (6 for execReduce and 1 main).
 We believe this is the best performance in our occasion since we actually do not do any context switching so we pretty much
 reduce the overhead and get better performance.

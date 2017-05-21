@@ -328,10 +328,10 @@ OUT_ITEMS_VEC RunMapReduceFramework(MapReduceBase& mapReduce, IN_ITEMS_VEC& item
 
 void Emit2 (k2Base*, v2Base*)
 {
-    
+    thread_list_map[pthread_self()].push(std::make_pair(key, val));
 }
 
 void Emit3 (k3Base*, v3Base*)
 {
-    
+    thread_list_reduce[pthread_self()].push_back(std::make_pair(key, val));
 }
