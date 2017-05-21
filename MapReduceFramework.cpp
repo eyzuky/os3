@@ -43,7 +43,7 @@ OUT_ITEMS_VEC out_items_vec;
 
 
 pthread_cond_t exec_shuffle_notification;
-shuffled_list shuffled;
+shuffled_list shuffled; // todo became reduceDataHandler
 MapReduceLogger *logger = new MapReduceLogger();
 
 bool mapPartOver;
@@ -81,7 +81,6 @@ class mapDataHandler {
     }
 };
 
-
 class reduceDataHandler {
 
 private:
@@ -108,16 +107,15 @@ public:
     {
         return this->_bulkIndex;
     }
-    void applyReduce(const k2Base *const keyOne, const shuffled_list *const _items)
+    void applyReduce(const k2Base *const key, const shuffled_list *const _items)
     {
-    //    this->_mapReduceBase.Reduce(keyOne,valueOne);
+        this->_mapReduceBase.Reduce(key, _items);
     }
     shuffled_pair getItem(unsigned int index){
         return this->_items[index];
     }  //TODO - something here doesn't work -  i think its ok now :)
     //Works now because a list in c++ is a linked list and you cannot access it with index.. so it is a vector now
 };
-
 
 void * frameworkInitialization(){
     mapPartOver = false;
@@ -152,7 +150,7 @@ void * mapExec(void * data){
         // todo uniting all the queues...
         map_pair itemToAdd;
         map_pair_list& queueToCopy = thread_list_map[pthread_self()];
-        map_pair_list& destQueue = threadsItemsLists[pthread_self()];
+        map_pair_list& destQueue = threadsItemsLists[pthread_self()]; // todo check threadsItemsLists right palce?
 
         while (!queueToCopy.empty())
         {
@@ -175,13 +173,11 @@ void * shuffle(void * data){
 
     pthread_mutex_lock(&mapMutex); // todo mapmutex or indexMutex
     pthread_mutex_unlock(&mapMutex);
-//    checkIfWriteSucceed(); // todo do we need this?
 
     int retVal;
 
     while (!mapPartOver)
     {
-        timeToWait = getTimeToWait();
 
         pthread_mutex_lock(&fakeMutex);
         retVal = pthread_cond_timedwait(&shufflerCV, &fakeMutex, &timeToWait);
@@ -204,7 +200,6 @@ void * shuffle(void * data){
 
     return nullptr;
 }
-
 
 void * joinQueues(void * data){
     map_pair itemToAdd;
@@ -229,7 +224,6 @@ void * joinQueues(void * data){
     return nullptr;
 }
 
-
 void * reduceExec(void * data){
     
     
@@ -253,8 +247,6 @@ void * reduceExec(void * data){
     
     return nullptr;
 }
-
-
 
 OUT_ITEMS_VEC RunMapReduceFramework(MapReduceBase& mapReduce, IN_ITEMS_VEC& itemsVec,
                                     int multiThreadLevel, bool autoDeleteV2K2)
@@ -314,6 +306,7 @@ OUT_ITEMS_VEC RunMapReduceFramework(MapReduceBase& mapReduce, IN_ITEMS_VEC& item
         pthread_create(&reduce_threads[i], NULL, reduceExec, &reduce_handler);
     }
 
+    //todo sort the container?
     
     //============================================================================
     // log info
@@ -323,9 +316,6 @@ OUT_ITEMS_VEC RunMapReduceFramework(MapReduceBase& mapReduce, IN_ITEMS_VEC& item
     logger->logFinished();
     return out_items_vec;
 }
-
-
-
 
 void Emit2 (k2Base* key, v2Base* val) {
 
