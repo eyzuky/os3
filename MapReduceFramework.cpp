@@ -28,9 +28,9 @@ using namespace std;
 //===============================
 //TYPEDEFS
 
-typedef pair<k2Base,v2Base> map_pair;             // INTERMEDIATE_ITEM;
+typedef pair<k2Base*,v2Base*> map_pair;             // INTERMEDIATE_ITEM;
 typedef vector<map_pair> map_pair_list;             // INTERMEDIATE_ITEMS_LIST
-typedef pair<k2Base, V2_VEC> shuffled_pair; // REDUCE_ITEM
+typedef pair<k2Base*, V2_VEC> shuffled_pair; // REDUCE_ITEM
 typedef vector<shuffled_pair> shuffled_list;        // REDUCE_ITEMS_LIST
 typedef OUT_ITEM reduced_pair;        // OUT_ITEM
 typedef vector<reduced_pair> reduced_list;          // OUT_ITEMS_QUEUE
@@ -97,7 +97,7 @@ private:
     const MapReduceBase& _mapReduceBase;
 
 public:
-    const shuffled_list items;
+    shuffled_list items;
     reduceDataHandler(shuffled_list &items_vec, const MapReduceBase& mapReduceBase): items(items_vec), _mapReduceBase(mapReduceBase){
         _bulkIndex = 0;
     }
@@ -218,7 +218,6 @@ void * mapExec(void * data){
 }
 
 
-
 void * joinQueues() {
     for (auto it = thread_list_map.begin(); it != thread_list_map.end(); ++it)
     {
@@ -226,14 +225,14 @@ void * joinQueues() {
         pthread_mutex_lock(&thread_mutex_map[it->first]);
         for(auto pair = list.begin(); pair != list.end(); ++pair)
         {
-            if(std::find(shuffled.begin(), shuffled.end(), pair->first) == shuffled.end()) {
+            if(std::find(shuffled.begin(), shuffled.end(), pair->first) == (shuffled.end()->first)) {
                 V2_VEC newVec;
-                newVec.insert(newVec.begin(), &pair->second);
+                newVec.insert(newVec.begin(), pair->second);
                 shuffled_pair item = make_pair(pair->first, newVec);
                 shuffled.insert(shuffled.end(), item);
             } else {
                 shuffled_pair * iter = std::find(shuffled.begin(), shuffled.end(), pair->first);
-                iter->second.insert(iter->second.begin(), &pair->second);
+                iter->second.insert(iter->second.begin(), pair->second);
             }
         }
         pthread_mutex_unlock(&thread_mutex_map[it->first]);
@@ -419,11 +418,11 @@ void Emit2 (k2Base* key, v2Base* val) {
         exceptionCaller(" sem Post fail");
     }
 
-    thread_list_map[pthread_self()].insert(thread_list_map[pthread_self()].end(), std::make_pair(*key, *val));
+    thread_list_map[pthread_self()].insert(thread_list_map[pthread_self()].end(), std::make_pair(key, val));
 
 }
 
 void Emit3 (k3Base* key, v3Base* val)
 {
-    thread_list_reduce[pthread_self()].push_back(std::make_pair(*key, *val));
+    thread_list_reduce[pthread_self()].push_back(std::make_pair(key, val));
 }
