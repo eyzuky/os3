@@ -14,10 +14,12 @@
 #include "MapReduceLogger.hpp"
 #include <map>
 #include <vector>
+#include <semaphore.h>
 //===========================
 //DEFINES
 
 #define BULK 10
+#define FAIL -1
 
 using namespace std;
 
@@ -34,12 +36,14 @@ typedef pair<pthread_t, map_pair_list> thread_and_list; // threadsOutput
 typedef vector<thread_and_list> threads_and_their_list; //
 //===============================
 //GLOBALS AND MUTEX
+sem_t sem;
 pthread_mutex_t map_mutex;
 pthread_mutex_t index_mutex;
 map <pthread_t, pthread_mutex_t> thread_mutex_map; //threadsItemsListsMutex
 map <pthread_t, map_pair_list> thread_list_map; //threadsItemsListsTemp
 map <pthread_t, map_pair_list> thread_list_reduce;
 OUT_ITEMS_VEC out_items_vec;
+
 
 
 pthread_cond_t exec_shuffle_notification;
@@ -248,6 +252,11 @@ void * reduceExec(void * data){
     return nullptr;
 }
 
+static void exceptionCaller(string exc){
+    cerr << exc;
+    exit(FAIL);
+}
+
 OUT_ITEMS_VEC RunMapReduceFramework(MapReduceBase& mapReduce, IN_ITEMS_VEC& itemsVec,
                                     int multiThreadLevel, bool autoDeleteV2K2)
 {
@@ -307,6 +316,7 @@ OUT_ITEMS_VEC RunMapReduceFramework(MapReduceBase& mapReduce, IN_ITEMS_VEC& item
     }
 
     //todo sort the container?
+    // todo add all the items to out items vec
     
     //============================================================================
     // log info
@@ -318,6 +328,10 @@ OUT_ITEMS_VEC RunMapReduceFramework(MapReduceBase& mapReduce, IN_ITEMS_VEC& item
 }
 
 void Emit2 (k2Base* key, v2Base* val) {
+    if (){
+
+    }
+    if
 
     thread_list_map[pthread_self()].push(std::make_pair(key, val));
 }
