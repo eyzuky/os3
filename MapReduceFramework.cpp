@@ -16,6 +16,7 @@
 #include <vector>
 #include <semaphore.h>
 #include <iostream>
+#include <algorithm>
 //===========================
 //DEFINES
 
@@ -41,10 +42,11 @@ sem_t sem;
 pthread_mutex_t map_mutex;
 pthread_mutex_t index_mutex;
 pthread_mutex_t reduce_mutex;
+pthread_mutex_t fakeMutex;
 map <pthread_t, pthread_mutex_t> thread_mutex_map; //threadsItemsListsMutex
 map <pthread_t, map_pair_list> thread_list_map; //threadsItemsListsTemp
 map<pthread_t, reduced_list> thread_list_reduce;
-
+shuffled_list shuffled;
 
 pthread_cond_t exec_shuffle_notification;
 MapReduceLogger *logger = new MapReduceLogger();
@@ -53,23 +55,21 @@ static void exceptionCaller(string exc){
     exit(FAIL);
 }
 
-
-
 bool mapPartOver;
 //=============dast class======
 //notice that I almost remade this class, there were tons of conceptual errors (e.g trying to set a const not in the initialization list,
 // or wrong names of variables and stuff. see git commits to see the differences
 class mapDataHandler {
 
-    private:
+private:
     unsigned int _bulkIndex;
     const IN_ITEMS_VEC _items;
     const MapReduceBase& _mapReduceBase;
-    
-    public:
+
+public:
     mapDataHandler(IN_ITEMS_VEC &items_vec, const MapReduceBase& mapReduceBase): _items(items_vec), _mapReduceBase(mapReduceBase){
-                _bulkIndex = 0;
-   }
+        _bulkIndex = 0;
+    }
     void proceedToNextBulk()
     {
         this->_bulkIndex = BULK + _bulkIndex;
@@ -94,11 +94,11 @@ class reduceDataHandler {
 
 private:
     unsigned int _bulkIndex;
-    const shuffled_list _items;
     const MapReduceBase& _mapReduceBase;
 
 public:
-    reduceDataHandler(shuffled_list &items_vec, const MapReduceBase& mapReduceBase): _items(items_vec), _mapReduceBase(mapReduceBase){
+    const shuffled_list items;
+    reduceDataHandler(shuffled_list &items_vec, const MapReduceBase& mapReduceBase): items(items_vec), _mapReduceBase(mapReduceBase){
         _bulkIndex = 0;
     }
 
@@ -110,20 +110,19 @@ public:
     }
     unsigned int getSize()
     {
-        return this->_items.size();
+        return this->items.size();
     }
     int getCurrentIndex()
     {
         return this->_bulkIndex;
     }
-    void applyReduce(const k2Base *const key, const shuffled_list *const _items)
+    void applyReduce(const k2Base *const key, const V2_VEC vec)
     {
-       // this->_mapReduceBase.Reduce(key, _items);
+        this->_mapReduceBase.Reduce(key, vec);
     }
     shuffled_pair getItem(unsigned int index){
-        return this->_items[index];
-    }  //TODO - something here doesn't work -  i think its ok now :)
-    //Works now because a list in c++ is a linked list and you cannot access it with index.. so it is a vector now
+        return this->items[index];
+    }
 };
 
 void * frameworkInitialization(){
@@ -131,10 +130,35 @@ void * frameworkInitialization(){
     if(sem_init(&sem, 0 ,0) == FAIL){
         exceptionCaller(" Sem init Fail");
     }
+    // mutex init
+    pthread_mutex_init(&fakeMutex);
+    pthread_mutex_init(reduce_mutex);
+    pthread_mutex_init(map_mutex);
+    pthread_mutex_init(index_mutex);
     //todo initialize all the global variables
-    
+
     return nullptr;
 }
+
+void * frameworkDistraction(){
+    mapPartOver = false;
+
+    // mutex destroy
+    pthread_mutex_destroy(&fakeMutex);
+    pthread_mutex_destroy(reduce_mutex);
+    pthread_mutex_destroy(map_mutex);
+    pthread_mutex_destroy(index_mutex);
+    //todo initialize all the global variables
+    //globals clear
+    sem_destroy(sem);
+    thread_mutex_map.clear();
+    thread_list_map.clear(); //threadsItemsListsTemp
+    thread_list_reduce.clear();
+    shuffled.clear();
+
+    return nullptr;
+}
+
 void * mapExec(void * data){
     int test; //test will check for errors and exceptions
     logger->logThreadCreated(ExecMap);
@@ -169,13 +193,13 @@ void * mapExec(void * data){
         // todo uniting all the queues...
         map_pair itemToAdd;
         map_pair_list& queueToCopy = thread_list_map[pthread_self()];
-       // map_pair_list& destQueue = threadsItemsLists[pthread_self()]; // todo check threadsItemsLists right palce?
+        // map_pair_list& destQueue = threadsItemsLists[pthread_self()]; // todo check threadsItemsLists right palce?
 
         while (!queueToCopy.empty())
         {
             itemToAdd = queueToCopy.front();
-       //     queueToCopy.pop();
-        //    destQueue.push(itemToAdd);
+            //     queueToCopy.pop();
+            //    destQueue.push(itemToAdd);
         }
 
         test = pthread_mutex_unlock(&thread_mutex_map[pthread_self()]);
@@ -189,15 +213,38 @@ void * mapExec(void * data){
     }
     logger->logThreadTerminated(ExecMap);
 
-    
+
+    return nullptr;
+}
+
+void * joinQueues() {
+    for (auto it = thread_list_map.begin(); it != thread_list_map.end(); ++it)
+    {
+        map_pair_list list = it->second;
+        pthread_mutex_lock(&thread_mutex_map[it->first]);
+        for(auto pair = list.begin(); pair != list.end(); ++pair)
+        {
+            if(std::find(shuffled.begin(), shuffled.end(), pair->first) == shuffled.end()) {
+                V2_VEC newVec;
+                newVec.insert(newVec.begin(), &pair->second);
+                shuffled_pair item = make_pair(pair->first, newVec);
+                shuffled.insert(shuffled.end(), item);
+            } else {
+                shuffled_pair * iter = std::find(shuffled.begin(), shuffled.end(), pair->first);
+                iter->second.insert(iter->second.begin(), &pair->second);
+            }
+        }
+        pthread_mutex_unlock(&thread_mutex_map[it->first]);
+    }
     return nullptr;
 }
 
 void * shuffle(void * data){
     logger->logThreadCreated(Shuffle);
 
-    pthread_mutex_lock(&map_mutex); // todo mapmutex or indexMutex
-    pthread_mutex_unlock(&mapMutex);
+    pthread_mutex_lock(&map_mutex);
+
+    pthread_mutex_unlock(&map_mutex);
 
     int retVal;
 
@@ -210,55 +257,27 @@ void * shuffle(void * data){
 
         // todo?
         pthread_mutex_lock(&fakeMutex);
-        retVal = pthread_cond_timedwait(&shufflerCV, &fakeMutex, &timeToWait);
 
-        if (retVal != 0 && retVal != ETIMEDOUT)
-        {
-
-        }
        // pthread_mutex_unlock(&fakeMutex);
 
     }
     joinQueues();
 
- //   pthread_mutex_lock(&logMutex);
+    //   pthread_mutex_lock(&logMutex);
     logger->logThreadTerminated(Shuffle);
 
- //   pthread_mutex_unlock(&logMutex);
+    //   pthread_mutex_unlock(&logMutex);
 //    //todo checkIfWriteSucceed(); - do we need this?
 
     return nullptr;
 }
 
-void * joinQueues(void * data){
-    map_pair itemToAdd;
-    for (auto it = threadsItemsLists.begin();
-         it != threadsItemsLists.end();
-         ++it){
-        while (!it->second.empty()){
-            pthread_mutex_lock(&threadsItemsListsMutex[it->first]);
-            itemToAdd = it->second.front();
-            it->second.pop();
-            if (reduceDataHandler._items.count(itemToAdd.first) == 0)
-            {
-                reduceDataHandler._items[itemToAdd.first] = std::list<v2Base *>(1, itemToAdd.second);
-            }
-            else    // shufflerMap has that key.
-            {
-                reduceDataHandler._items[itemToAdd.first].push_back(itemToAdd.second);
-            }
-        }
-        pthread_mutex_unlock(&threadsItemsListsMutex[it->first]);
-    }
-    return nullptr;
-}
-
 void * reduceExec(void * data){
     int test;
-    
+
     logger->logThreadCreated(ExecReduce);
     int curIndex = 0;
-   // shuffled_pair pair;
+    // shuffled_pair pair;
     reduceDataHandler *handler = (reduceDataHandler*)data;
     while ( handler->getCurrentIndex() < handler->getSize()) {
         test = pthread_mutex_lock(&index_mutex);
@@ -276,11 +295,9 @@ void * reduceExec(void * data){
             handler->applyReduce(pair.first, pair.second);
         }
     }
-    
+
     return nullptr;
 }
-
-
 
 OUT_ITEMS_VEC RunMapReduceFramework(MapReduceBase& mapReduce, IN_ITEMS_VEC& itemsVec,
                                     int multiThreadLevel, bool autoDeleteV2K2)
@@ -330,6 +347,9 @@ OUT_ITEMS_VEC RunMapReduceFramework(MapReduceBase& mapReduce, IN_ITEMS_VEC& item
         if (test == FAIL){
             exceptionCaller("Failed to join threads");
         }
+    }
+    if(sem_post( sem) == FAIL){
+        exceptionCaller("sem post fail");
     }
     mapPartOver = true;
 
