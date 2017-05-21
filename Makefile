@@ -5,11 +5,10 @@ CXX = g++ -std=c++11
 FLAGS = -Wextra -Wall -lpthread
 FILES_TO_CREATE =  Search tar
 FILES_TO_DELETE = *.o  MapReduceFramework.a Search
-FILES_FOR_TAR = *.cpp *.h git  README
-FILES_FOR_SEARCH = Search.cpp  MapReduceFramework.h
+FILES_FOR_TAR = *.cpp *.h *.hpp git README
 GIVEN_HEADERS = MapReduceClient.h MapReduceFramework.h
-FILES_FOR_SEARCH_FRAME = Search.*
-FILES_FOR_FRAME = MapReduceFramework.cpp
+FILES_FOR_SEARCH = Search.* SearchKeyValues.* MapReduceFramework.h
+FILES_FOR_FRAME = MapReduceFramework.cpp MapReduceLogger.*
 
 Search: MapReduceFramework.a Search.o
 	$(CXX) -lpthread Search.o -L. MapReduceFramework.a -o Search
