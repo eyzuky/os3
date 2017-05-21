@@ -16,6 +16,7 @@
 #include <vector>
 #include <semaphore.h>
 #include <iostream>
+#include <algorithm>
 //===========================
 //DEFINES
 
@@ -41,10 +42,11 @@ sem_t sem;
 pthread_mutex_t map_mutex;
 pthread_mutex_t index_mutex;
 pthread_mutex_t reduce_mutex;
+pthread_mutex_t fakeMutex;
 map <pthread_t, pthread_mutex_t> thread_mutex_map; //threadsItemsListsMutex
 map <pthread_t, map_pair_list> thread_list_map; //threadsItemsListsTemp
 map<pthread_t, reduced_list> thread_list_reduce;
-
+shuffled_list shuffled;
 
 pthread_cond_t exec_shuffle_notification;
 MapReduceLogger *logger = new MapReduceLogger();
@@ -94,11 +96,11 @@ class reduceDataHandler {
 
 private:
     unsigned int _bulkIndex;
-    const shuffled_list _items;
     const MapReduceBase& _mapReduceBase;
 
 public:
-    reduceDataHandler(shuffled_list &items_vec, const MapReduceBase& mapReduceBase): _items(items_vec), _mapReduceBase(mapReduceBase){
+    const shuffled_list items;
+    reduceDataHandler(shuffled_list &items_vec, const MapReduceBase& mapReduceBase): items(items_vec), _mapReduceBase(mapReduceBase){
         _bulkIndex = 0;
     }
 
@@ -110,20 +112,19 @@ public:
     }
     unsigned int getSize()
     {
-        return this->_items.size();
+        return this->items.size();
     }
     int getCurrentIndex()
     {
         return this->_bulkIndex;
     }
-    void applyReduce(const k2Base *const key, const shuffled_list *const _items)
+    void applyReduce(const k2Base *const key, const V2_VEC vec)
     {
-       // this->_mapReduceBase.Reduce(key, _items);
+        this->_mapReduceBase.Reduce(key, vec);
     }
     shuffled_pair getItem(unsigned int index){
-        return this->_items[index];
-    }  //TODO - something here doesn't work -  i think its ok now :)
-    //Works now because a list in c++ is a linked list and you cannot access it with index.. so it is a vector now
+        return this->items[index];
+    }
 };
 
 void * frameworkInitialization(){
@@ -193,11 +194,33 @@ void * mapExec(void * data){
     return nullptr;
 }
 
+void * joinQueues() {
+    for (auto it = thread_list_map.begin(); it != thread_list_map.end(); ++it)
+    {
+        map_pair_list list = it->second;
+        pthread_mutex_lock(&thread_mutex_map[it->first]);
+        for(auto pair = list.begin(); pair != list.end(); ++pair)
+        {
+            if(std::find(shuffled.begin(), shuffled.end(), pair->first) == shuffled.end()) {
+                V2_VEC newVec;
+                newVec.insert(newVec.begin(), &pair->second);
+                shuffled_pair item = make_pair(pair->first, newVec);
+                shuffled.insert(shuffled.end(), item);
+            } else {
+                shuffled_pair * iter = std::find(shuffled.begin(), shuffled.end(), pair->first);
+                iter->second.insert(iter->second.begin(), &pair->second);
+            }
+        }
+        pthread_mutex_unlock(&thread_mutex_map[it->first]);
+    }
+    return nullptr;
+}
+
 void * shuffle(void * data){
     logger->logThreadCreated(Shuffle);
 
     pthread_mutex_lock(&map_mutex); // todo mapmutex or indexMutex
-    pthread_mutex_unlock(&mapMutex);
+    pthread_mutex_unlock(&map_mutex);
 
     int retVal;
 
@@ -210,12 +233,8 @@ void * shuffle(void * data){
 
         // todo?
         pthread_mutex_lock(&fakeMutex);
-        retVal = pthread_cond_timedwait(&shufflerCV, &fakeMutex, &timeToWait);
 
-        if (retVal != 0 && retVal != ETIMEDOUT)
-        {
-
-        }
+      
        // pthread_mutex_unlock(&fakeMutex);
 
     }
@@ -230,28 +249,7 @@ void * shuffle(void * data){
     return nullptr;
 }
 
-void * joinQueues(void * data){
-    map_pair itemToAdd;
-    for (auto it = threadsItemsLists.begin();
-         it != threadsItemsLists.end();
-         ++it){
-        while (!it->second.empty()){
-            pthread_mutex_lock(&threadsItemsListsMutex[it->first]);
-            itemToAdd = it->second.front();
-            it->second.pop();
-            if (reduceDataHandler._items.count(itemToAdd.first) == 0)
-            {
-                reduceDataHandler._items[itemToAdd.first] = std::list<v2Base *>(1, itemToAdd.second);
-            }
-            else    // shufflerMap has that key.
-            {
-                reduceDataHandler._items[itemToAdd.first].push_back(itemToAdd.second);
-            }
-        }
-        pthread_mutex_unlock(&threadsItemsListsMutex[it->first]);
-    }
-    return nullptr;
-}
+
 
 void * reduceExec(void * data){
     int test;

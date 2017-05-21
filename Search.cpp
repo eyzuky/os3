@@ -8,7 +8,7 @@
 
 #include "Search.hpp"
 #include "SearchKeyValues.hpp"
-
+#include <dirent.h>
 #define MULTI_THREADED_LEVEL 10
 int main(int argc, char* argv[]){
     
