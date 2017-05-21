@@ -36,9 +36,9 @@ typedef vector<thread_and_list> threads_and_their_list; //
 //GLOBALS AND MUTEX
 pthread_mutex_t map_mutex;
 pthread_mutex_t index_mutex;
+pthread_mutex_t reduce_mutex;
 map <pthread_t, pthread_mutex_t> thread_mutex_map; //threadsItemsListsMutex
 map <pthread_t, map_pair_list> thread_list_map; //threadsItemsListsTemp
-map <pthread_t, map_pair_list> thread_list_reduce;
 OUT_ITEMS_VEC out_items_vec;
 
 
@@ -300,14 +300,24 @@ OUT_ITEMS_VEC RunMapReduceFramework(MapReduceBase& mapReduce, IN_ITEMS_VEC& item
     //reduce and output
     reduceDataHandler reduce_handler = reduceDataHandler(shuffled, mapReduce);
     pthread_t *reduce_threads = new pthread_t[multiThreadLevel];
-    
+    map<pthread_t, reduced_list> thread_list_reduce;
+    pthread_mutex_lock(&reduce_mutex);
     for (int i = 0; i < multiThreadLevel; ++i)
     {
         pthread_create(&reduce_threads[i], NULL, reduceExec, &reduce_handler);
-    }
-
-    //todo sort the container?
+        reduced_list reduced;
+        thread_list_reduce[reduce_threads[i]] = reduced;
     
+    }
+    pthread_mutex_unlock(&reduce_mutex);
+    for (auto list = thread_list_reduce.begin(); list != thread_list_reduce.end(); ++list)
+    {
+        for (auto pair = list.begin(); pair != list.end(); ++pair)
+        {
+            out_items_vec.push_back(pair)
+        }
+    }
+    sort(out_items_vec.begin(), out_items_vec.end())
     //============================================================================
     // log info
     //============================================================================
