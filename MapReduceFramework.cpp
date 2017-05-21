@@ -19,7 +19,6 @@
 
 #define BULK 10
 
-
 using namespace std;
 
 //===============================
@@ -38,8 +37,10 @@ typedef vector<thread_and_list> threads_and_their_list; //
 pthread_mutex_t map_mutex;
 pthread_mutex_t index_mutex;
 map <pthread_t, pthread_mutex_t> thread_mutex_map; //threadsItemsListsMutex
-map <pthread_t, map_pair_list> thread_list_map;
+map <pthread_t, map_pair_list> thread_list_map; //threadsItemsListsTemp
 map <pthread_t, map_pair_list> thread_list_reduce;
+OUT_ITEMS_VEC out_items_vec;
+
 
 pthread_cond_t exec_shuffle_notification;
 shuffled_list shuffled;
@@ -314,7 +315,6 @@ OUT_ITEMS_VEC RunMapReduceFramework(MapReduceBase& mapReduce, IN_ITEMS_VEC& item
     }
 
     
-    OUT_ITEMS_VEC out_items_vec;
     //============================================================================
     // log info
     //============================================================================
@@ -326,12 +326,13 @@ OUT_ITEMS_VEC RunMapReduceFramework(MapReduceBase& mapReduce, IN_ITEMS_VEC& item
 
 
 
-void Emit2 (k2Base*, v2Base*)
-{
+
+void Emit2 (k2Base* key, v2Base* val) {
+
     thread_list_map[pthread_self()].push(std::make_pair(key, val));
 }
 
-void Emit3 (k3Base*, v3Base*)
+void Emit3 (k3Base* key, v3Base* val)
 {
     thread_list_reduce[pthread_self()].push_back(std::make_pair(key, val));
 }
