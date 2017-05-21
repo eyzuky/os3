@@ -15,6 +15,7 @@
 #include <map>
 #include <vector>
 #include <semaphore.h>
+#include <iostream>
 //===========================
 //DEFINES
 
@@ -28,9 +29,9 @@ using namespace std;
 
 typedef pair<k2Base,v2Base> map_pair;             // INTERMEDIATE_ITEM;
 typedef vector<map_pair> map_pair_list;             // INTERMEDIATE_ITEMS_LIST
-typedef pair<k2Base, list<v2Base>> shuffled_pair; // REDUCE_ITEM
+typedef pair<k2Base, V2_VEC> shuffled_pair; // REDUCE_ITEM
 typedef vector<shuffled_pair> shuffled_list;        // REDUCE_ITEMS_LIST
-typedef pair<k3Base, v3Base> reduced_pair;        // OUT_ITEM
+typedef OUT_ITEM reduced_pair;        // OUT_ITEM
 typedef vector<reduced_pair> reduced_list;          // OUT_ITEMS_QUEUE
 typedef pair<pthread_t, map_pair_list> thread_and_list; // threadsOutput
 typedef vector<thread_and_list> threads_and_their_list; //
@@ -42,12 +43,16 @@ pthread_mutex_t index_mutex;
 pthread_mutex_t reduce_mutex;
 map <pthread_t, pthread_mutex_t> thread_mutex_map; //threadsItemsListsMutex
 map <pthread_t, map_pair_list> thread_list_map; //threadsItemsListsTemp
-OUT_ITEMS_VEC out_items_vec;
-
+map<pthread_t, reduced_list> thread_list_reduce;
 
 
 pthread_cond_t exec_shuffle_notification;
 MapReduceLogger *logger = new MapReduceLogger();
+static void exceptionCaller(string exc){
+    cerr << exc;
+    exit(FAIL);
+}
+
 
 
 bool mapPartOver;
@@ -113,7 +118,7 @@ public:
     }
     void applyReduce(const k2Base *const key, const shuffled_list *const _items)
     {
-        this->_mapReduceBase.Reduce(key, _items);
+       // this->_mapReduceBase.Reduce(key, _items);
     }
     shuffled_pair getItem(unsigned int index){
         return this->_items[index];
@@ -130,19 +135,24 @@ void * frameworkInitialization(){
     
     return nullptr;
 }
-
 void * mapExec(void * data){
-
+    int test; //test will check for errors and exceptions
     logger->logThreadCreated(ExecMap);
     int curIndex = 0;
     IN_ITEM item;
     mapDataHandler * handler = (mapDataHandler*) data;
 
     while (handler->getCurrentIndex() < handler->getSize()) {
-        pthread_mutex_lock(&index_mutex);
+        test = pthread_mutex_lock(&index_mutex);
+        if (test == FAIL){
+            exceptionCaller("Failed to lock mutex");
+        }
         curIndex = handler->getCurrentIndex();
         handler->proceedToNextBulk();
-        pthread_mutex_unlock(&index_mutex);
+        test = pthread_mutex_unlock(&index_mutex);
+        if (test == FAIL){
+            exceptionCaller("Failed to unlock mutex");
+        }
         for (int i = curIndex; i < curIndex + BULK; ++i)
         {
             if(i >= handler->getSize())
@@ -152,23 +162,31 @@ void * mapExec(void * data){
             item = handler->getItem(i);
             handler->applyMap(item.first, item.second);
         }
-        pthread_mutex_lock(&thread_mutex_map[pthread_self()]);
-        
+        test = pthread_mutex_lock(&thread_mutex_map[pthread_self()]);
+        if (test == FAIL){
+            exceptionCaller("Failed to lock mutex");
+        }
         // todo uniting all the queues...
         map_pair itemToAdd;
         map_pair_list& queueToCopy = thread_list_map[pthread_self()];
-        map_pair_list& destQueue = threadsItemsLists[pthread_self()]; // todo check threadsItemsLists right palce?
+       // map_pair_list& destQueue = threadsItemsLists[pthread_self()]; // todo check threadsItemsLists right palce?
 
         while (!queueToCopy.empty())
         {
             itemToAdd = queueToCopy.front();
-            queueToCopy.pop();
-            destQueue.push(itemToAdd);
+       //     queueToCopy.pop();
+        //    destQueue.push(itemToAdd);
         }
 
-        pthread_mutex_unlock(&thread_mutex_map[pthread_self()]);
+        test = pthread_mutex_unlock(&thread_mutex_map[pthread_self()]);
+        if (test == FAIL){
+            exceptionCaller("Failed to unlock mutex");
+        }
     }
-    pthread_cond_signal(&exec_shuffle_notification);
+    test = pthread_cond_signal(&exec_shuffle_notification);
+    if (test == FAIL){
+        exceptionCaller("Failed to send signal");
+    }
     logger->logThreadTerminated(ExecMap);
 
     
@@ -179,6 +197,7 @@ void * shuffle(void * data){
     logger->logThreadCreated(Shuffle);
 
     pthread_mutex_lock(&map_mutex); // todo mapmutex or indexMutex
+    pthread_mutex_unlock(&mapMutex);
 
     int retVal;
 
@@ -197,15 +216,15 @@ void * shuffle(void * data){
         {
 
         }
-        pthread_mutex_unlock(&fakeMutex);
+       // pthread_mutex_unlock(&fakeMutex);
 
     }
     joinQueues();
 
-    pthread_mutex_lock(&logMutex);
+ //   pthread_mutex_lock(&logMutex);
     logger->logThreadTerminated(Shuffle);
 
-    pthread_mutex_unlock(&logMutex);
+ //   pthread_mutex_unlock(&logMutex);
 //    //todo checkIfWriteSucceed(); - do we need this?
 
     return nullptr;
@@ -235,14 +254,17 @@ void * joinQueues(void * data){
 }
 
 void * reduceExec(void * data){
-    
+    int test;
     
     logger->logThreadCreated(ExecReduce);
     int curIndex = 0;
-    shuffled_pair pair;
+   // shuffled_pair pair;
     reduceDataHandler *handler = (reduceDataHandler*)data;
     while ( handler->getCurrentIndex() < handler->getSize()) {
-        pthread_mutex_lock(&index_mutex);
+        test = pthread_mutex_lock(&index_mutex);
+        if (test == FAIL){
+            exceptionCaller("Failed to lock mutex");
+        }
         curIndex = handler->getCurrentIndex();
         handler->proceedToNextBulk();
         for(int i = 0; i < BULK; i++){
@@ -250,7 +272,7 @@ void * reduceExec(void * data){
             {
                 break;
             }
-            pair = handler->getItem(i);
+            shuffled_pair pair = handler->getItem(i);
             handler->applyReduce(pair.first, pair.second);
         }
     }
@@ -258,16 +280,13 @@ void * reduceExec(void * data){
     return nullptr;
 }
 
-static void exceptionCaller(string exc){
-    cerr << exc;
-    exit(FAIL);
-}
+
 
 OUT_ITEMS_VEC RunMapReduceFramework(MapReduceBase& mapReduce, IN_ITEMS_VEC& itemsVec,
                                     int multiThreadLevel, bool autoDeleteV2K2)
 {
     frameworkInitialization();
-
+    int test;
     //===========================================================================
     // log info
     //===========================================================================
@@ -279,29 +298,51 @@ OUT_ITEMS_VEC RunMapReduceFramework(MapReduceBase& mapReduce, IN_ITEMS_VEC& item
     mapDataHandler map_handler = mapDataHandler(itemsVec, mapReduce);
 
     pthread_t *map_threads = new pthread_t[multiThreadLevel];
+
     pthread_t shuffle_thread;
 
-    pthread_mutex_lock(&map_mutex);
+    test = pthread_mutex_lock(&map_mutex);
+    if (test == FAIL){
+        exceptionCaller("Failed to lock mutex");
+    }
     //this loop creates a thread, a list for a thread and adds it to our threads-list list.
     for (int i = 0; i < multiThreadLevel; i++)
     {
-        pthread_create(&map_threads[i], NULL, mapExec, &map_handler);
+        test = pthread_create(&map_threads[i], NULL, mapExec, &map_handler);
+        if (test == FAIL){
+            exceptionCaller("Failed to create thread");
+        }
         map_pair_list list_for_thread;
         thread_list_map[map_threads[i]] = list_for_thread;
         thread_mutex_map[map_threads[i]] = PTHREAD_MUTEX_INITIALIZER;
     }
-    pthread_mutex_unlock(&map_mutex);
-    pthread_create(&shuffle_thread, NULL, shuffle, nullptr);
+    test = pthread_mutex_unlock(&map_mutex);
+    if (test == FAIL){
+        exceptionCaller("Failed to unlock mutex");
+    }
+    test = pthread_create(&shuffle_thread, NULL, shuffle, nullptr);
+    if (test == FAIL){
+        exceptionCaller("Failed to create shuffle thread");
+    }
     for (int i = 0; i < multiThreadLevel; ++i)
     {
-        pthread_join(map_threads[i], NULL);
+        test = pthread_join(map_threads[i], NULL);
+        if (test == FAIL){
+            exceptionCaller("Failed to join threads");
+        }
     }
     mapPartOver = true;
 
-    pthread_join(shuffle_thread, NULL);
+    test = pthread_join(shuffle_thread, NULL);
+    if (test == FAIL){
+        exceptionCaller("Failed to join threads");
+    }
     for (auto iter = thread_mutex_map.begin(); iter != thread_mutex_map.end(); ++iter)
     {
-        pthread_mutex_destroy(&(iter->second));
+        test = pthread_mutex_destroy(&(iter->second));
+        if (test == FAIL){
+            exceptionCaller("Failed to destroy threads");
+        }
     }
     delete [] map_threads;
     //===========================================================================
@@ -315,22 +356,29 @@ OUT_ITEMS_VEC RunMapReduceFramework(MapReduceBase& mapReduce, IN_ITEMS_VEC& item
     //reduce and output
     reduceDataHandler reduce_handler = reduceDataHandler(shuffled, mapReduce);
     pthread_t *reduce_threads = new pthread_t[multiThreadLevel];
-    map<pthread_t, reduced_list> thread_list_reduce;
-    pthread_mutex_lock(&reduce_mutex);
+    test = pthread_mutex_lock(&reduce_mutex);
+    if (test == FAIL){
+        exceptionCaller("Failed to lock mutex");
+    }
     for (int i = 0; i < multiThreadLevel; ++i)
     {
-        pthread_create(&reduce_threads[i], NULL, reduceExec, &reduce_handler);
+        test = pthread_create(&reduce_threads[i], NULL, reduceExec, &reduce_handler);
+        if (test == FAIL){
+            exceptionCaller("Failed to create thread");
+        }
         reduced_list reduced;
         thread_list_reduce[reduce_threads[i]] = reduced;
 
     }
-    pthread_mutex_unlock(&reduce_mutex);
+    test = pthread_mutex_unlock(&reduce_mutex);
+    if (test == FAIL){
+        exceptionCaller("Failed to unlock mutex");
+    }
+    OUT_ITEMS_VEC out_items_vec;
     for (auto list = thread_list_reduce.begin(); list != thread_list_reduce.end(); ++list)
     {
-        for (auto pair = list.begin(); pair != list.end(); ++pair)
-        {
-            out_items_vec.push_back(pair);
-        }
+        reduced_list reduced = list->second;
+        out_items_vec.insert(out_items_vec.end(), reduced.begin(), reduced.end());
     }
     sort(out_items_vec.begin(), out_items_vec.end());
     //============================================================================
@@ -345,10 +393,12 @@ void Emit2 (k2Base* key, v2Base* val) {
     if (sem_post(&sem) == FAIL){
         exceptionCaller(" sem Post fail");
     }
-    thread_list_map[pthread_self()].push(std::make_pair(key, val));
+
+    thread_list_map[pthread_self()].insert(thread_list_map[pthread_self()].end(), std::make_pair(*key, *val));
+
 }
 
 void Emit3 (k3Base* key, v3Base* val)
 {
-    thread_list_reduce[pthread_self()].push_back(std::make_pair(key, val));
+    thread_list_reduce[pthread_self()].push_back(std::make_pair(*key, *val));
 }
