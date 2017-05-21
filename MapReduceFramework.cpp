@@ -47,8 +47,8 @@ OUT_ITEMS_VEC out_items_vec;
 
 
 pthread_cond_t exec_shuffle_notification;
-shuffled_list shuffled; // todo became reduceDataHandler
 MapReduceLogger *logger = new MapReduceLogger();
+
 
 bool mapPartOver;
 //=============dast class======
@@ -123,6 +123,9 @@ public:
 
 void * frameworkInitialization(){
     mapPartOver = false;
+    if(sem_init(&sem, 0 ,0) == FAIL){
+        exceptionCaller(" Sem init Fail");
+    }
     //todo initialize all the global variables
     
     return nullptr;
@@ -175,24 +178,27 @@ void * mapExec(void * data){
 void * shuffle(void * data){
     logger->logThreadCreated(Shuffle);
 
-    pthread_mutex_lock(&mapMutex); // todo mapmutex or indexMutex
-    pthread_mutex_unlock(&mapMutex);
+    pthread_mutex_lock(&map_mutex); // todo mapmutex or indexMutex
 
     int retVal;
 
     while (!mapPartOver)
     {
+        if (sem_wait(&sem) == FAIL){
+            exceptionCaller("sem wait failure");
+        }
+        joinQueues();
 
+        // todo?
         pthread_mutex_lock(&fakeMutex);
         retVal = pthread_cond_timedwait(&shufflerCV, &fakeMutex, &timeToWait);
 
         if (retVal != 0 && retVal != ETIMEDOUT)
         {
-            exitIfFail(1, COND_TIMEDWAIT);
+
         }
         pthread_mutex_unlock(&fakeMutex);
 
-        joinQueues();
     }
     joinQueues();
 
@@ -214,13 +220,13 @@ void * joinQueues(void * data){
             pthread_mutex_lock(&threadsItemsListsMutex[it->first]);
             itemToAdd = it->second.front();
             it->second.pop();
-            if (shuffled.count(itemToAdd.first) == 0)
+            if (reduceDataHandler._items.count(itemToAdd.first) == 0)
             {
-                shuffled[itemToAdd.first] = std::list<v2Base *>(1, itemToAdd.second);
+                reduceDataHandler._items[itemToAdd.first] = std::list<v2Base *>(1, itemToAdd.second);
             }
             else    // shufflerMap has that key.
             {
-                shuffled[itemToAdd.first].push_back(itemToAdd.second);
+                reduceDataHandler._items[itemToAdd.first].push_back(itemToAdd.second);
             }
         }
         pthread_mutex_unlock(&threadsItemsListsMutex[it->first]);
@@ -323,10 +329,10 @@ OUT_ITEMS_VEC RunMapReduceFramework(MapReduceBase& mapReduce, IN_ITEMS_VEC& item
     {
         for (auto pair = list.begin(); pair != list.end(); ++pair)
         {
-            out_items_vec.push_back(pair)
+            out_items_vec.push_back(pair);
         }
     }
-    sort(out_items_vec.begin(), out_items_vec.end())
+    sort(out_items_vec.begin(), out_items_vec.end());
     //============================================================================
     // log info
     //============================================================================
@@ -336,11 +342,9 @@ OUT_ITEMS_VEC RunMapReduceFramework(MapReduceBase& mapReduce, IN_ITEMS_VEC& item
     return out_items_vec;
 }
 void Emit2 (k2Base* key, v2Base* val) {
-    if (){
-
+    if (sem_post(&sem) == FAIL){
+        exceptionCaller(" sem Post fail");
     }
-    if
-
     thread_list_map[pthread_self()].push(std::make_pair(key, val));
 }
 
