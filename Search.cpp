@@ -7,7 +7,6 @@
 //
 
 #include "Search.hpp"
-#include "SearchKeyValues.hpp"
 #include <dirent.h>
 #define MULTI_THREADED_LEVEL 10
 int main(int argc, char* argv[]){
@@ -47,8 +46,9 @@ SearchMapReduce::~SearchMapReduce(){}
 
 void SearchMapReduce::Map(const k1Base *const key, const v1Base *const val) const
 {
-
-
+    if(val != NULL){
+       exit(-1);
+    }
     DIR *dir;
     struct dirent *ent;
     const char* dirName = ((const SearchK1* const)key)->directory_name.c_str();
@@ -70,6 +70,9 @@ void SearchMapReduce::Map(const k1Base *const key, const v1Base *const val) cons
 
 void SearchMapReduce::Reduce(const k2Base *const key, const V2_VEC &vals) const
 {
+    if(key != NULL){
+
+    }
     for (auto f = vals.begin(); f != vals.end(); f++)
     {
         SearchV2* files = (SearchV2*)(*f);

@@ -7,10 +7,9 @@
 //
 
 #include <stdio.h>
-#include "MapReduceFramework.h"
+#include "MapReduceFramework.cpp"
 #include <iostream>
 #include <string>
-
 #ifndef Search_hpp
 #define Search_hpp
 
