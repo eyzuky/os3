@@ -1,0 +1,26 @@
+runMapReduceFramework started with 4 threads
+Thread ExecMap created [24.4.117 21:38:19]
+Thread ExecMap created [24.4.117 21:38:19]
+Thread ExecMap created [24.4.117 21:38:19]
+Thread ExecMap created [24.4.117 21:38:19]
+Thread Shuffle created [24.4.117 21:38:19]
+Thread ExecMap terminated [24.4.117 21:38:19]
+Thread ExecMap created [24.4.117 21:38:19]
+Thread ExecMap created [24.4.117 21:38:23]
+Thread ExecMap created [24.4.117 21:38:34]
+Thread ExecMap created [24.4.117 21:38:34]
+Thread ExecMap terminated [24.4.117 21:38:43]
+Thread ExecMap terminated [24.4.117 21:38:43]
+Thread ExecMap terminated [24.4.117 21:38:43]
+Thread Shuffle terminated [24.4.117 21:38:43]
+Map and Shuffle took 25000074368 ns
+Thread ExecReduce created [24.4.117 21:38:44]
+Thread ExecReduce created [24.4.117 21:38:44]
+Thread ExecReduce created [24.4.117 21:38:44]
+Thread ExecReduce created [24.4.117 21:38:44]
+Thread ExecReduce terminated [24.4.117 21:38:44]
+Thread ExecReduce terminated [24.4.117 21:38:44]
+Thread ExecReduce terminated [24.4.117 21:38:44]
+Thread ExecReduce terminated [24.4.117 21:38:44]
+Reduce took 72543 ns
+RunMapReduceFramework finished

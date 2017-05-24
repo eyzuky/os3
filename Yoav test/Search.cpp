@@ -31,7 +31,10 @@ int main(int argc, char* argv[]){
     }
     
     OUT_ITEMS_VEC outputVector = RunMapReduceFramework(searcher, inputVector, MULTI_THREADED_LEVEL, true);
-    //todo: print the files 
+    for(auto f = outputVector.begin(); f != outputVector.end(); ++f)
+    {
+
+    }
     return 0;
     
     

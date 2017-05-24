@@ -3,9 +3,9 @@
 #include "MapReduceFramework.h"
 
 
-#define NUM_ITERS 10000
+#define NUM_ITERS 300
 
-#define NUM_PER_ITER 500
+#define NUM_PER_ITER 30
 
 
 struct NumWrapper : public k1Base, public v1Base, public k2Base, public v2Base, public k3Base, public v3Base
@@ -84,12 +84,12 @@ int main(int argc, char *argv[])
     {
         std::cout << ((NumWrapper *) item.first)->num << " : " << ((NumWrapper *) item.second)->num << " times"
                   << std::endl;
-        delete item.first;
-        delete item.second;
+        //delete item.first;
+        //delete item.second;
     }
     for (int i = 0; i < NUM_ITERS; ++i)
     {
-        delete v.at(i).first;
-        delete v.at(i).second;
+    //    delete v.at(i).first;
+      //  delete v.at(i).second;
     }
 }
