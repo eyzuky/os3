@@ -55,8 +55,8 @@ public:
         {
             Emit2(new elements(1),new elements(1));
         }
-//        delete key;
-//        delete val;
+        delete key;
+        delete val;
     }
 
     virtual void Reduce(const k2Base *const key, const V2_VEC &vals) const
